@@ -1,7 +1,7 @@
 # chatNEKO
 ## English Description
 QQ group bot, chat with ChatGPT, and search for pixiv illustrations.
-## Usage
+### Usage
 1. tmux # start a new tmux session
 2. cd cqhttp && chmod +x go-cqhttp
 3. ./go-cqhttp # launch go-cqhttp and login with your own bot account
@@ -14,7 +14,7 @@ If you have any question on the usage of paramters, use python backend.py -h to 
 
 ## 中文介绍
 这是一个QQ聊天机器人，可以与ChatGPT聊天，并可以搜索pixiv的插画。
-## 使用方法
+### 使用方法
 1. tmux # 启动一个新的tmux窗口
 2. cd cqhttp && chmod +x go-cqhttp
 3. ./go-cqhttp # 启动go-cqhttp，并按照提示登陆bot账号
