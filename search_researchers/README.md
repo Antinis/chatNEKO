@@ -18,6 +18,12 @@ Here is an example command:
 
     python Retrive.py --orgs zju,tokyo --interests Computer_Vision,Machine_Learning --min_cit 10000
 
+Or to use bot:
+
+    from Retrieve import bot_api
+    args='--orgs zju,tokyo --interests Computer_Vision,Machine_Learning --min_cit 10000'
+    messages=bot_api(args)
+
 This command will search for researchers from orgnizations related to `zju` and `tokyo`that have interests in Computer Vision and Machine Learning and have a minimum of 10000 citations.
 
 The result is:
@@ -53,7 +59,7 @@ Found 6 in 207
 4       Yoichi Sato                               Professor, Institute of Industrial Science, The University of Tokyo   computer vision         14068.0
 5   Kiyoharu Aizawa                                                                               University of Tokyo   computer vision         12299.0
 
-
+### Messages to bot
 
 Zhejiang University
 Chunhua Shen & Yi Yang & Xiaofei He & Deng Cai & Fei Wu & Wenguan Wang & Hujun Bao
