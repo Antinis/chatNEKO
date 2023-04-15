@@ -7,12 +7,15 @@ import requests;
 import json;
 import re;
 import argparse;
+from search_researchers.Retrieve import bot_api;
+import pdb;
 
 app = Flask(__name__)
 
 '''监听端口，获取QQ信息'''
 @app.route('/', methods=["POST"])
 def post_data():
+    # pdb.set_trace();
     global msg;
     if request.get_json().get('message_type')=='group':
         gid = request.get_json().get('group_id')
@@ -63,6 +66,25 @@ def setu(keyword, gid):
     else:
         path=download_pic(id);
         send_pic(gid, path);
+
+def search_gs(sch_args, gid):
+    if args.use_proxy:
+        sch_args+=f" --http_proxy {args.proxy_addr}";
+        sch_args+=f" --https_proxy {args.proxy_addr}";
+    else:
+        sch_args+=f" --no_proxy";
+    if " --not_save" not in sch_args:
+        sch_args+=" --not_save";
+    sch_msg=f"传入指令为\'{sch_args}\'";
+    requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(str(gid), sch_msg));
+    sch_msg="正在搜索喵～";
+    requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(str(gid), sch_msg));
+    try:
+        sch_msg=bot_api(sch_args);
+    except:
+        sch_msg="检索失败了喵！";
+    requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(str(gid), sch_msg));
+    return;
 
 def search_pic(keyword):
     if args.use_proxy:
@@ -214,7 +236,9 @@ def send_pic(gid, path):
 
 def handle(gid, message):
     if gid == args.group_id:   # 目前只向特定群提供服务
+        print("Group ID True")
         if "[CQ:at,qq={}]".format(args.qq_id) in message:  # 呼出bot
+            print("Message True")
             user_msg=message.replace("[CQ:at,qq={}] ".format(args.qq_id), ""); # 切掉信头
 
             if user_msg.split(" ")[0]=="chat":  # 呼出chatGPT服务
@@ -229,10 +253,19 @@ def handle(gid, message):
             if user_msg.split(" ")[0]=="setu":  # 呼出pixiv搜图服务
                 setu(user_msg.replace("setu ", ""), gid);
                 return;
-            
-            
 
-            requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(args.group_id, "这里是chatNEKO喵，使用方法：\n\n1. chatGPT聊天\n   @chatNEKO chat *聊天内容*\n\n2. 清除chatGPT上下文并开始新会话\n   @chatNEKO chat clear\n\n3. pixiv插画搜索\n   @chatNEKO setu *关键词*\n\n请注意，“@chatNEKO”标识符只有在手动键盘输入并选择用户时才能生效。直接从剪贴板粘贴“@chatNEKO”无效。\n\n希望更多功能或建议请联系作者Antinis zhangyunxuan@zju.edu.cn\n\n快来跟我玩喵~"));
+            if user_msg.split(" ")[0]=="search": # 呼出Google Scholar快速搜索服务
+                search_gs((user_msg).replace("search ", ""), gid);
+                return;
+
+            requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(args.group_id, 
+            "这里是chatNEKO喵，使用方法：\n\n" + 
+            "1. chatGPT聊天\n   @chatNEKO chat *聊天内容*\n\n" + 
+            "2. 清除chatGPT上下文并开始新会话\n   @chatNEKO chat clear\n\n" + 
+            "3. pixiv插画搜索\n   @chatNEKO setu *关键词*\n\n" + 
+            "4. Google Scholar 快速检索\n   @chatNEKO search *搜索指令*，用法请参考search_researchers/README.md\n\n" + 
+            "请注意，“@chatNEKO”标识符只有在手动键盘输入并选择用户时才能生效。直接从剪贴板粘贴“@chatNEKO”无效。\n\n" + 
+            "Github项目地址为 https://github.com/Antinis/chatNEKO 希望更多功能或建议请联系作者Antinis zhangyunxuan@zju.edu.cn\n\n快来跟我玩喵~"));
 
 global msg;
 msg=[];
