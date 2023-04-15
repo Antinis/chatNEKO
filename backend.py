@@ -15,7 +15,6 @@ app = Flask(__name__)
 '''监听端口，获取QQ信息'''
 @app.route('/', methods=["POST"])
 def post_data():
-    # pdb.set_trace();
     global msg;
     if request.get_json().get('message_type')=='group':
         gid = request.get_json().get('group_id')
@@ -236,9 +235,7 @@ def send_pic(gid, path):
 
 def handle(gid, message):
     if gid == args.group_id:   # 目前只向特定群提供服务
-        print("Group ID True")
         if "[CQ:at,qq={}]".format(args.qq_id) in message:  # 呼出bot
-            print("Message True")
             user_msg=message.replace("[CQ:at,qq={}] ".format(args.qq_id), ""); # 切掉信头
 
             if user_msg.split(" ")[0]=="chat":  # 呼出chatGPT服务

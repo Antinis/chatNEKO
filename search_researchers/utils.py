@@ -16,7 +16,7 @@ def init_opts(opts=None):
     parser = argparse.ArgumentParser(description='Google Scholar Crawler')
 
     parser.add_argument('--orgs', type=str, default='zju,tokyo', 
-                        help='Organizations, use \',\' to split, eg: \'zju,tokyo\'')
+                        help='Organizations, use \',\' to split, eg: \'zju,tokyo\'') #
     parser.add_argument('--no_proxy', action='store_true', help='Do not use proxy')
     parser.add_argument('--http_proxy', type=str, default='127.0.0.1:1080', 
                         help='The http proxy address, eg: 127.0.0.1:1080')
