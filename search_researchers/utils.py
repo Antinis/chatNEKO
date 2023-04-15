@@ -96,6 +96,6 @@ def search_by_org(org_id, Org, tmporg, opt, infos, results):
 
 def extract_names(info, inst):
 
-    names = ' & '.join([name for name in info['Name']])
+    names = ' '.join([name.replace(' ', '_') for name in info['Name']])
 
     return f'{inst}\n{names}\n\n'

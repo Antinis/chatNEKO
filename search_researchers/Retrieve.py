@@ -3,7 +3,7 @@ from scholarly import scholarly
 import sys, os
 import shlex
 
-from utils import *
+from .utils import *
 
 def main(opt):
 
@@ -16,6 +16,8 @@ def main(opt):
 
     Orgs = opt.orgs.split(',')
     print(RED + '\n' + 'Start researching!' + RESET)
+    rst = ''
+
     for Org in Orgs:
         print(RED + 'Start searching ' + GREEN + Org + RESET)
         if not os.path.exists(Org) and not opt.not_save:
@@ -26,10 +28,9 @@ def main(opt):
                 print(RED + 'Start searching ' + GREEN + org['Organization'] + RESET)
                 search_by_org(int(org['id']), Org, org['Organization'], opt, infos, results)
         except:
-            print('Cannot Fetch from Google Scholar!\nMaybe there is something wrong with the proxy settings！')
+            rst = 'Cannot Fetch from Google Scholar!\nMaybe there is something wrong with the proxy settings！'
             break
     
-    rst = ''
     for i in range(len(results['researchers'])):
         print(results['researchers'][i])
         rst += extract_names(infos[i], results['institution'][i])
