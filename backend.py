@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-from turtle import pensize
 from flask import Flask, request
 import os
 import openai;
@@ -10,7 +9,8 @@ import re;
 import argparse;
 from search_researchers.Retrieve import bot_api;
 import sys;
-import signal
+import signal;
+import copy
 
 app = Flask(__name__)
 func_dict = {}
@@ -37,7 +37,7 @@ def register_func(name, alarm):
 def handler(signum, frame):
     requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(str(args.group_id), "操作超时！"));
 
-def handle_exit_signal(signal_num, frame):
+def handle_exit_signal(signum, frame):
     requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(str(args.group_id), "下线了喵～"));
     exit(0)
 
@@ -56,7 +56,7 @@ def _excute(mode, user_msg, gid):
 def restart(msg, gid):
     requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(gid, "正在重启..."));
     python=sys.executable;
-    py_argv=sys.argv;
+    py_argv=copy.deepcopy(sys.argv);
     print(*py_argv);
     if "--openai_key" in py_argv:
         py_argv[py_argv.index("--openai_key")+1]="***";

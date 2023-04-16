@@ -19,18 +19,28 @@ def main(opt):
     print(RED + '\n' + 'Start researching!' + RESET)
     rst = ''
 
-    for Org in Orgs:
-        print(RED + 'Start searching ' + GREEN + Org + RESET)
-        if not os.path.exists(Org) and not opt.not_save:
-            os.makedirs(Org)
-        try:
-            orgs = scholarly.search_org(Org)
-            for org in orgs:
-                print(RED + 'Start searching ' + GREEN + org['Organization'] + RESET)
-                search_by_org(int(org['id']), Org, org['Organization'], opt, infos, results)
-        except:
-            rst = 'Cannot Fetch from Google Scholar!\nMaybe there is something wrong with the proxy settings！'
-            break
+    if opt.use_id:
+        print(RED + 'Start searching by id' + RESET)
+        for id in opt.orgs_id.split(','):
+            print(RED + 'Start searching ' + GREEN + id + RESET)
+            try:
+                search_by_org(int(id), id, id, opt, infos, results)
+            except:
+                rst = 'Cannot Fetch from Google Scholar!\nMaybe there is something wrong with the proxy settings！'
+                break
+    else:
+        for Org in Orgs:
+            print(RED + 'Start searching ' + GREEN + Org + RESET)
+            if not os.path.exists(Org) and not opt.not_save:
+                os.makedirs(Org)
+            try:
+                orgs = scholarly.search_org(Org)
+                for org in orgs:
+                    print(RED + 'Start searching ' + GREEN + org['Organization'] + RESET)
+                    search_by_org(int(org['id']), Org, org['Organization'], opt, infos, results)
+            except:
+                rst = 'Cannot Fetch from Google Scholar!\nMaybe there is something wrong with the proxy settings！'
+                break
     
     for i in range(len(results['researchers'])):
         print(results['researchers'][i])

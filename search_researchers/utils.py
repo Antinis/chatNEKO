@@ -17,11 +17,14 @@ def init_opts(opts=None):
 
     parser.add_argument('--orgs', type=str, default='zju,tokyo', 
                         help='Organizations, use \',\' to split, eg: \'zju,tokyo\'') #
+    parser.add_argument('--use_id', action='store_true', help='Use orgnization id to search')
+    parser.add_argument('--orgs_id', type=str, default='1118375729466322660,8929680262811525562', 
+                        help='Google Scholar id of organizations, see url of an orgnization, use \',\' to split, eg: \'1118375729466322660,8929680262811525562\'') #
     parser.add_argument('--no_proxy', action='store_true', help='Do not use proxy')
-    parser.add_argument('--http_proxy', type=str, default='127.0.0.1:1080', 
-                        help='The http proxy address, eg: 127.0.0.1:1080')
-    parser.add_argument('--https_proxy', type=str, default='127.0.0.1:1080', 
-                        help='The https proxy address, eg: 127.0.0.1:1080')
+    parser.add_argument('--http_proxy', type=str, default='127.0.0.1:20172', 
+                        help='The http proxy address, eg: 127.0.0.1:20172')
+    parser.add_argument('--https_proxy', type=str, default='127.0.0.1:20172', 
+                        help='The https proxy address, eg: 127.0.0.1:20172')
     parser.add_argument('--interests', type=str, default='Computer_Vision,Machine_Learning', 
                         help='The research fields, use \',\' to split, eg: Computer_Vision,Machine_Learning')
     parser.add_argument('--min_cit', type=int, default=500, help='Minimum number of citations')

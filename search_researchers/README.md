@@ -7,6 +7,8 @@ The script will automatically search for researchers based on the specified affi
 Command line arguments include:
 
 * `--orgs`: The organizations to search for researchers (separated by comma).
+* `--use_id`: Use organization id to search for researchers, more exactable.
+* `--orgs_id`: The organization ids to search for researchers (separated by comma).
 * `--no_proxy`: Whether to use a proxy or not (use --no_proxy to disable using a proxy).
 * `--http_proxy`: The HTTP proxy address (e.g., 127.0.0.1:1080).
 * `--https_proxy`: The HTTPS proxy address (e.g., 127.0.0.1:1080).
