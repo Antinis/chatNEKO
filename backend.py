@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from turtle import pensize
 from flask import Flask, request
 import os
 import openai;
@@ -8,7 +9,8 @@ import json;
 import re;
 import argparse;
 from search_researchers.Retrieve import bot_api;
-import pdb;
+import sys;
+import signal
 
 app = Flask(__name__)
 
@@ -23,6 +25,31 @@ def post_data():
 
     return 'OK'
 
+def restart(gid):
+    python=sys.executable;
+    py_argv=sys.argv;
+    print(*py_argv);
+    if "--openai_key" in py_argv:
+        py_argv[py_argv.index("--openai_key")+1]="***";
+    py_argv="python "+" ".join(py_argv);
+    requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(str(gid), py_argv));
+    os.execl(python, python, *sys.argv);
+
+def handler(signum, frame):
+    requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(str(args.group_id), "操作超时！"));
+
+def handle_exit_signal(signal_num, frame):
+    requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(str(args.group_id), "下线了喵～"));
+    exit(0)
+
+def _excute(alarm, func, msg, gid):
+    signal.alarm(alarm);
+    try:
+        print(f"{func.__name__}({msg}, {gid})\ntimeout: {alarm}");
+        func(msg, gid);
+        signal.alarm(0);
+    except Exception as e:
+        signal.alarm(0);
 
 def chat(user_message, gid):
     global msg;
@@ -244,16 +271,20 @@ def handle(gid, message):
                     msg=[];
                     requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(args.group_id, "已清除上下文"));
                     return;
-                chat(user_msg.replace("chat ", ""), gid);
+                _excute(120, chat, user_msg.replace("chat ", ""), gid);
                 return;
             
             if user_msg.split(" ")[0]=="setu":  # 呼出pixiv搜图服务
-                setu(user_msg.replace("setu ", ""), gid);
+                _excute(60, setu, user_msg.replace("setu ", ""), gid);
                 return;
 
             if user_msg.split(" ")[0]=="search": # 呼出Google Scholar快速搜索服务
-                search_gs((user_msg).replace("search ", ""), gid);
+                _excute(600, search_gs, user_msg.replace("search ", ""), gid);
                 return;
+
+            if user_msg=="restart":
+                requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(args.group_id, "正在重启..."));
+                restart(gid);
 
             requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(args.group_id, 
             "这里是chatNEKO喵，使用方法：\n\n" + 
@@ -261,11 +292,15 @@ def handle(gid, message):
             "2. 清除chatGPT上下文并开始新会话\n   @chatNEKO chat clear\n\n" + 
             "3. pixiv插画搜索\n   @chatNEKO setu *关键词*\n\n" + 
             "4. Google Scholar 快速检索\n   @chatNEKO search *搜索指令*，用法请参考search_researchers/README.md\n\n" + 
+            "5. 重启chatNEKO\n  @chatNEKO restart\n\n" + 
             "请注意，“@chatNEKO”标识符只有在手动键盘输入并选择用户时才能生效。直接从剪贴板粘贴“@chatNEKO”无效。\n\n" + 
             "Github项目地址为 https://github.com/Antinis/chatNEKO 希望更多功能或建议请联系作者Antinis zhangyunxuan@zju.edu.cn\n\n快来跟我玩喵~"));
 
 global msg;
 msg=[];
+signal.signal(signal.SIGALRM, handler)
+signal.signal(signal.SIGINT, handle_exit_signal)
+signal.signal(signal.SIGTERM, handle_exit_signal)
 parser=argparse.ArgumentParser(description='test')
 parser.add_argument('--qq_id', default=False, type=int, help='QQ id of the bot')
 parser.add_argument('--group_id', default=False, type=int, help='Which QQ group do you want to arrange this bot?')
@@ -277,4 +312,5 @@ args=parser.parse_args()
 if args.openai_key:
     openai.api_key=args.openai_key;
 
-app.run(debug=False, host='127.0.0.1', port=5701)
+requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(args.group_id, "chatNEKO 已启动"));
+app.run(debug=False, host='127.0.0.1', port=5701);
