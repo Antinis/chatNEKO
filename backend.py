@@ -13,6 +13,8 @@ import sys;
 import signal
 
 app = Flask(__name__)
+func_dict = {}
+alarm_dict = {}
 
 '''监听端口，获取QQ信息'''
 @app.route('/', methods=["POST"])
@@ -25,7 +27,34 @@ def post_data():
 
     return 'OK'
 
-def restart(gid):
+def register_func(name, alarm):
+    def decorator(func):
+        func_dict[name] = func
+        alarm_dict[name] = alarm
+        return func
+    return decorator
+
+def handler(signum, frame):
+    requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(str(args.group_id), "操作超时！"));
+
+def handle_exit_signal(signal_num, frame):
+    requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(str(args.group_id), "下线了喵～"));
+    exit(0)
+
+def _excute(mode, user_msg, gid):
+    alarm=alarm_dict[mode]
+    msg=user_msg.replace(mode+" ", "")
+    signal.alarm(alarm);
+    try:
+        print(f"{func_dict[mode].__name__}({msg}, {gid})\ntimeout: {alarm}");
+        func_dict[mode](msg, gid);
+        signal.alarm(0);
+    except Exception as e:
+        signal.alarm(0);
+
+@register_func(name="restart", alarm=60)
+def restart(msg, gid):
+    requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(gid, "正在重启..."));
     python=sys.executable;
     py_argv=sys.argv;
     print(*py_argv);
@@ -35,22 +64,7 @@ def restart(gid):
     requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(str(gid), py_argv));
     os.execl(python, python, *sys.argv);
 
-def handler(signum, frame):
-    requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(str(args.group_id), "操作超时！"));
-
-def handle_exit_signal(signal_num, frame):
-    requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(str(args.group_id), "下线了喵～"));
-    exit(0)
-
-def _excute(alarm, func, msg, gid):
-    signal.alarm(alarm);
-    try:
-        print(f"{func.__name__}({msg}, {gid})\ntimeout: {alarm}");
-        func(msg, gid);
-        signal.alarm(0);
-    except Exception as e:
-        signal.alarm(0);
-
+@register_func(name="chat", alarm=120)
 def chat(user_message, gid):
     global msg;
     user_msg_dict={
@@ -84,6 +98,7 @@ def chat(user_message, gid):
 
     return;
 
+@register_func(name="setu", alarm=60)
 def setu(keyword, gid):
     id=search_pic(keyword);
     if id==-1:
@@ -93,7 +108,8 @@ def setu(keyword, gid):
         path=download_pic(id);
         send_pic(gid, path);
 
-def search_gs(sch_args, gid):
+@register_func(name="scholar", alarm=1200)
+def scholar(sch_args, gid):
     if args.use_proxy:
         sch_args+=f" --http_proxy {args.proxy_addr}";
         sch_args+=f" --https_proxy {args.proxy_addr}";
@@ -265,35 +281,24 @@ def handle(gid, message):
         if "[CQ:at,qq={}]".format(args.qq_id) in message:  # 呼出bot
             user_msg=message.replace("[CQ:at,qq={}] ".format(args.qq_id), ""); # 切掉信头
 
-            if user_msg.split(" ")[0]=="chat":  # 呼出chatGPT服务
-                if user_msg=="chat clear":       # 清除chatGPT上下文指令
+            mode=user_msg.split(" ")[0];
+            if user_msg=="chat clear":       # 清除chatGPT上下文指令
                     global msg;
                     msg=[];
                     requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(args.group_id, "已清除上下文"));
                     return;
-                _excute(120, chat, user_msg.replace("chat ", ""), gid);
+            if mode in func_dict:
+                _excute(mode, user_msg, gid)
                 return;
-            
-            if user_msg.split(" ")[0]=="setu":  # 呼出pixiv搜图服务
-                _excute(60, setu, user_msg.replace("setu ", ""), gid);
-                return;
-
-            if user_msg.split(" ")[0]=="search": # 呼出Google Scholar快速搜索服务
-                _excute(600, search_gs, user_msg.replace("search ", ""), gid);
-                return;
-
-            if user_msg=="restart":
-                requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(args.group_id, "正在重启..."));
-                restart(gid);
 
             requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(args.group_id, 
             "这里是chatNEKO喵，使用方法：\n\n" + 
             "1. chatGPT聊天\n   @chatNEKO chat *聊天内容*\n\n" + 
             "2. 清除chatGPT上下文并开始新会话\n   @chatNEKO chat clear\n\n" + 
             "3. pixiv插画搜索\n   @chatNEKO setu *关键词*\n\n" + 
-            "4. Google Scholar 快速检索\n   @chatNEKO search *搜索指令*，用法请参考search_researchers/README.md\n\n" + 
+            "4. Google Scholar 快速检索\n   @chatNEKO scholar *搜索指令*，用法请参考search_researchers/README.md\n\n" + 
             "5. 重启chatNEKO\n  @chatNEKO restart\n\n" + 
-            "请注意，“@chatNEKO”标识符只有在手动键盘输入并选择用户时才能生效。直接从剪贴板粘贴“@chatNEKO”无效。\n\n" + 
+            "请注意，“@chatNEKO”标识符只有在手动键盘输入并选择用户时才能生效。直接从剪贴板粘贴“@chatNEKO”无效。同时@自带空格，无需手动输入。\n\n" + 
             "Github项目地址为 https://github.com/Antinis/chatNEKO 希望更多功能或建议请联系作者Antinis zhangyunxuan@zju.edu.cn\n\n快来跟我玩喵~"));
 
 global msg;
