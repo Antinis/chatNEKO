@@ -135,10 +135,10 @@ def scholar(sch_args, gid):
     requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(str(gid), sch_msg));
     return;
 
-@register_func(name='generate', alarm=120)
+@register_func(name='generate', alarm=180)
 def generate(prompt, gid):
 
-    save_dir = "./generate"
+    save_dir = "generate"
     if not os.path.exists(save_dir):
         os.mkdir(save_dir)
     generated_imgs = os.listdir(save_dir)
@@ -176,6 +176,26 @@ def generate(prompt, gid):
                 response_json = cur_json
         img_link = response_json['output'][0]
         img_path = os.path.join(save_dir, img_link.split('/')[-1])
+
+        sr_url = "https://appyhigh-ai.p.rapidapi.com/rapidapi/enhancer/2k"
+        sr_payload = {"source_url": img_link,
+	               "filename": ""}
+        sr_headers = {"content-type": "application/json",
+	                  "X-RapidAPI-Key": args.x_rapid_key,
+	                  "X-RapidAPI-Host": "appyhigh-ai.p.rapidapi.com"}
+        while True:
+            try:
+                response = requests.post(url=sr_url, headers=sr_headers, json=sr_payload)
+                response_json = response.json()
+                if response_json['message'] == 'Accepted':
+                    break
+            except:
+                pass
+        img_link = response_json['data']['2k']['url']
+        pre_ext = img_path.split('.')[-1]
+        cur_ext = img_link.split('/')[-1].split('.')[-1]
+        img_path = img_path.replace(pre_ext, cur_ext)
+        
         while True:
             try:
                 img = requests.get(img_link)
@@ -186,12 +206,12 @@ def generate(prompt, gid):
         with open(img_path, 'wb') as f:
             f.write(img.content)
 
-        send_pic(gid, img_path)
+        send_pic(gid, img_path);
         return
     
     except Exception as e:
-        print(e)
-        requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(str(gid), "生成失败了喵"));
+        print(response_json)
+        requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(str(gid), f"生成失败了喵\n{response.text}"));
 
     return
 
@@ -379,6 +399,7 @@ parser.add_argument('--qq_id', default=False, type=int, help='QQ id of the bot')
 parser.add_argument('--group_id', default=False, type=int, help='Which QQ group do you want to arrange this bot?')
 parser.add_argument('--openai_key', default=False, type=str, help='The key of OpenAI ChatGPT API')
 parser.add_argument('--stable_diffusion_key', default=False, type=str, help='The key of Stable Diffusion API')
+parser.add_argument('--x_rapid_key', default=False, type=str, help='The key of X-RapidAPI')
 parser.add_argument('--use_proxy', default=False, type=bool, help='Whether to use proxy server? If you are using Chinese network service and you want to use pixiv illustration searching function, you may set this argument as True.')
 parser.add_argument('--proxy_addr', default=False, type=str, help='The address and port of proxy server.')
 args=parser.parse_args()
