@@ -135,7 +135,7 @@ def scholar(sch_args, gid):
     requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(str(gid), sch_msg));
     return;
 
-@register_func(name='generate', alarm=60)
+@register_func(name='generate', alarm=120)
 def generate(prompt, gid):
 
     save_dir = "./generate"
@@ -171,8 +171,9 @@ def generate(prompt, gid):
                     break
                 except:
                     pass
-            if response_json['output'] != '':
-                response_json = json.loads(response.text)
+            cur_json = json.loads(response.text)
+            if cur_json['status'] != 'processing':
+                response_json = cur_json
         img_link = response_json['output'][0]
         img_path = os.path.join(save_dir, img_link.split('/')[-1])
         while True:
