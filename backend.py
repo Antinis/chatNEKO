@@ -58,11 +58,18 @@ def restart(msg, gid):
     python=sys.executable;
     py_argv=copy.deepcopy(sys.argv);
     print(*py_argv);
-    if "--openai_key" in py_argv:
-        py_argv[py_argv.index("--openai_key")+1]="***";
+    for argv in py_argv:
+        if "_key" in argv:
+            py_argv[py_argv.index(argv)+1]="***";
     py_argv="python "+" ".join(py_argv);
     requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(str(gid), py_argv));
     os.execl(python, python, *sys.argv);
+
+@register_func(name="keychange", alarm=10)
+def keychange(keymsg, gid):
+    keytype, key = keymsg.split(" ")
+    args.__setattr__(f'{keytype}_key', key)
+    requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(str(gid), f"更改{keytype}_key为{key}"))
 
 @register_func(name="chat", alarm=120)
 def chat(user_message, gid):
@@ -127,6 +134,65 @@ def scholar(sch_args, gid):
         sch_msg="检索失败了喵！";
     requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(str(gid), sch_msg));
     return;
+
+@register_func(name='generate', alarm=60)
+def generate(prompt, gid):
+
+    save_dir = "./generate"
+    if not os.path.exists(save_dir):
+        os.mkdir(save_dir)
+    generated_imgs = os.listdir(save_dir)
+    while len(generated_imgs) > 100:
+        os.remove(generated_imgs[-1])
+        generated_imgs.pop()
+
+    try:
+        headers = {"Content-Type": "application/json"}
+        payload = {'key': args.stable_diffusion_key, 
+                   'model_id': 'anything-v4', 
+                   'prompt': prompt, 
+                   'negative_prompt': 'painting, extra fingers, mutated hands, poorly drawn hands, poorly drawn face, deformed, ugly, blurry, bad anatomy, bad proportions, extra limbs, cloned face, skinny, glitchy, double torso, extra arms, extra hands, mangled fingers, missing lips, ugly face, distorted face, extra legs, anime', 
+                   'width': '1080', 'height': '1080', 'samples': '1', 
+                   'num_inference_steps': '30', 'seed': None, 
+                   'guidance_scale': 7.5, 'webhook': None, 'track_id': None}
+        diffusion_url = "https://stablediffusionapi.com/api/v3/dreambooth"
+        while True:
+            try:
+                response = requests.post(diffusion_url, headers=headers, data=json.dumps(payload))
+                break
+            except:
+                pass
+        print(response.text)
+        response_json = json.loads(response.text)
+        while 'fetch_result' in response_json:
+            while True:
+                try:
+                    response = requests.post(response_json['fetch_result'], headers=headers, data=json.dumps(payload))
+                    break
+                except:
+                    pass
+            if response_json['output'] != '':
+                response_json = json.loads(response.text)
+        img_link = response_json['output'][0]
+        img_path = os.path.join(save_dir, img_link.split('/')[-1])
+        while True:
+            try:
+                img = requests.get(img_link)
+                break
+            except:
+                pass
+            
+        with open(img_path, 'wb') as f:
+            f.write(img.content)
+
+        send_pic(gid, img_path)
+        return
+    
+    except Exception as e:
+        print(e)
+        requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(str(gid), "生成失败了喵"));
+
+    return
 
 def search_pic(keyword):
     if args.use_proxy:
@@ -297,7 +363,8 @@ def handle(gid, message):
             "2. 清除chatGPT上下文并开始新会话\n   @chatNEKO chat clear\n\n" + 
             "3. pixiv插画搜索\n   @chatNEKO setu *关键词*\n\n" + 
             "4. Google Scholar 快速检索\n   @chatNEKO scholar *搜索指令*，用法请参考search_researchers/README.md\n\n" + 
-            "5. 重启chatNEKO\n  @chatNEKO restart\n\n" + 
+            "5. Stable Diffusion 生成插画\n   @chatNEKO generate *关键词*\n\n" + 
+            "6. 重启chatNEKO\n  @chatNEKO restart\n\n" + 
             "请注意，“@chatNEKO”标识符只有在手动键盘输入并选择用户时才能生效。直接从剪贴板粘贴“@chatNEKO”无效。同时@自带空格，无需手动输入。\n\n" + 
             "Github项目地址为 https://github.com/Antinis/chatNEKO 希望更多功能或建议请联系作者Antinis zhangyunxuan@zju.edu.cn\n\n快来跟我玩喵~"));
 
@@ -310,6 +377,7 @@ parser=argparse.ArgumentParser(description='test')
 parser.add_argument('--qq_id', default=False, type=int, help='QQ id of the bot')
 parser.add_argument('--group_id', default=False, type=int, help='Which QQ group do you want to arrange this bot?')
 parser.add_argument('--openai_key', default=False, type=str, help='The key of OpenAI ChatGPT API')
+parser.add_argument('--stable_diffusion_key', default=False, type=str, help='The key of Stable Diffusion API')
 parser.add_argument('--use_proxy', default=False, type=bool, help='Whether to use proxy server? If you are using Chinese network service and you want to use pixiv illustration searching function, you may set this argument as True.')
 parser.add_argument('--proxy_addr', default=False, type=str, help='The address and port of proxy server.')
 args=parser.parse_args()
