@@ -43,7 +43,7 @@ def handle_exit_signal(signum, frame):
 
 def _excute(mode, user_msg, gid):
     alarm=alarm_dict[mode]
-    msg=user_msg.replace(mode+" ", "")
+    msg=user_msg[len(mode)+1:]
     signal.alarm(alarm);
     try:
         print(f"{func_dict[mode].__name__}({msg}, {gid})\ntimeout: {alarm}");
@@ -68,8 +68,12 @@ def restart(msg, gid):
 @register_func(name="keychange", alarm=10)
 def keychange(keymsg, gid):
     keytype, key = keymsg.split(" ")
-    args.__setattr__(f'{keytype}_key', key)
-    requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(str(gid), f"更改{keytype}_key为{key}"))
+    try:
+        args.__setattr__(f'{keytype}_key', key)
+        msg = f"更改{keytype}_key为{key}"
+    except:
+        msg = "更改失败！"
+    requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(str(gid), msg))
 
 @register_func(name="chat", alarm=120)
 def chat(user_message, gid):
@@ -143,15 +147,17 @@ def generate(prompt, gid):
         os.mkdir(save_dir)
     generated_imgs = os.listdir(save_dir)
     while len(generated_imgs) > 100:
-        os.remove(generated_imgs[-1])
+        os.remove(save_dir + '/' + generated_imgs[-1])
         generated_imgs.pop()
 
+    base_prompt = ', ((masterpiece)), (super delicate),(illustration),(extremely delicate and beautiful),(dynamic angle), (beautiful and delicate eyes), (clear hand details), looking at viewers DSLR photography, sharp focus, Unreal Engine 5, Octane Render, Redshift, ((cinematic lighting)), f/1.4, ISO 200, 1/160s, 8K, RAW, unedited, symmetrical balance, in-frame'
+    prompt += base_prompt
     try:
         headers = {"Content-Type": "application/json"}
         payload = {'key': args.stable_diffusion_key, 
                    'model_id': 'anything-v4', 
-                   'prompt': prompt, 
-                   'negative_prompt': 'painting, extra fingers, mutated hands, poorly drawn hands, poorly drawn face, deformed, ugly, blurry, bad anatomy, bad proportions, extra limbs, cloned face, skinny, glitchy, double torso, extra arms, extra hands, mangled fingers, missing lips, ugly face, distorted face, extra legs, anime', 
+                   'prompt': prompt , 
+                   'negative_prompt': 'painting, (extra fingers), (mutated hands), (poorly drawn hands), poorly drawn face, (deformed), ugly, blurry, bad anatomy, bad proportions, (extra limbs), cloned face, skinny, glitchy, double torso, extra arms, extra hands, mangled fingers, missing lips, ugly face, distorted face, extra legs, bad posture, (wrong human body), anime', 
                    'width': '1080', 'height': '1080', 'samples': '1', 
                    'num_inference_steps': '30', 'seed': None, 
                    'guidance_scale': 7.5, 'webhook': None, 'track_id': None}
@@ -159,21 +165,14 @@ def generate(prompt, gid):
         while True:
             try:
                 response = requests.post(diffusion_url, headers=headers, data=json.dumps(payload))
-                break
+                response_json = response.json()
+                if response_json['status'] == 'success':
+                    break
+                elif response_json['status'] == 'processing':
+                    diffusion_url = response_json['fetch_result']
             except:
                 pass
         print(response.text)
-        response_json = json.loads(response.text)
-        while 'fetch_result' in response_json:
-            while True:
-                try:
-                    response = requests.post(response_json['fetch_result'], headers=headers, data=json.dumps(payload))
-                    break
-                except:
-                    pass
-            cur_json = json.loads(response.text)
-            if cur_json['status'] != 'processing':
-                response_json = cur_json
         img_link = response_json['output'][0]
         img_path = os.path.join(save_dir, img_link.split('/')[-1])
 
@@ -191,6 +190,7 @@ def generate(prompt, gid):
                     break
             except:
                 pass
+        ori_link = img_link
         img_link = response_json['data']['2k']['url']
         pre_ext = img_path.split('.')[-1]
         cur_ext = img_link.split('/')[-1].split('.')[-1]
@@ -199,12 +199,14 @@ def generate(prompt, gid):
         while True:
             try:
                 img = requests.get(img_link)
-                break
+                with open(img_path, 'wb') as f:
+                    f.write(img.content)
+                if os.path.getsize(img_path)/1024 < 50:
+                    img_link = ori_link 
+                else:
+                    break
             except:
                 pass
-            
-        with open(img_path, 'wb') as f:
-            f.write(img.content)
 
         send_pic(gid, img_path);
         return
