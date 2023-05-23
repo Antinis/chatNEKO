@@ -15,6 +15,7 @@ import copy
 app = Flask(__name__)
 func_dict = {}
 alarm_dict = {}
+alarm_id = ''
 
 '''监听端口，获取QQ信息'''
 @app.route('/', methods=["POST"])
@@ -23,7 +24,7 @@ def post_data():
     if request.get_json().get('message_type')=='group':
         gid = request.get_json().get('group_id')
         message = request.get_json().get('raw_message')
-        handle(gid, message);
+        handle(str(gid), message);
 
     return 'OK'
 
@@ -35,21 +36,24 @@ def register_func(name, alarm):
     return decorator
 
 def handler(signum, frame):
-    requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(str(args.group_id), "操作超时！"));
+    requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(alarm_id, "操作超时！"));
 
 def handle_exit_signal(signum, frame):
-    requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(str(args.group_id), "下线了喵～"));
+    global group_ids
+    for gid in group_ids:
+        requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(gid, "下线了喵～"));
     exit(0)
 
 def _excute(mode, user_msg, gid):
     alarm=alarm_dict[mode]
-    msg=user_msg.replace(mode+" ", "")
+    msg=user_msg[len(mode)+1:]
     signal.alarm(alarm);
     try:
         print(f"{func_dict[mode].__name__}({msg}, {gid})\ntimeout: {alarm}");
         func_dict[mode](msg, gid);
         signal.alarm(0);
     except Exception as e:
+        alarm_id = gid
         signal.alarm(0);
 
 @register_func(name="restart", alarm=60)
@@ -62,14 +66,18 @@ def restart(msg, gid):
         if "_key" in argv:
             py_argv[py_argv.index(argv)+1]="***";
     py_argv="python "+" ".join(py_argv);
-    requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(str(gid), py_argv));
+    requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(gid, py_argv));
     os.execl(python, python, *sys.argv);
 
 @register_func(name="keychange", alarm=10)
 def keychange(keymsg, gid):
     keytype, key = keymsg.split(" ")
-    args.__setattr__(f'{keytype}_key', key)
-    requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(str(gid), f"更改{keytype}_key为{key}"))
+    try:
+        args.__setattr__(f'{keytype}_key', key)
+        msg = f"更改{keytype}_key为{key}"
+    except:
+        msg = "更改失败！"
+    requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(gid, msg))
 
 @register_func(name="chat", alarm=120)
 def chat(user_message, gid):
@@ -78,7 +86,7 @@ def chat(user_message, gid):
         "role": "user",
         "content": user_message
     };
-    msg.append(user_msg_dict);
+    msg[gid].append(user_msg_dict);
 
     # 结构化数据并进行提交
     completion = openai.ChatCompletion.create(
@@ -89,19 +97,19 @@ def chat(user_message, gid):
         n = 1,                      # 默认条数1
         user = "user",              # 用户ID，用于机器人区分不同用户避免多用户时出现混淆
         model = "gpt-3.5-turbo",    # 这里注意openai官方有很多个模型
-        messages = msg
+        messages = msg[gid]
     )
     assi_msg = completion.choices[0].message.content    # chatGPT返回的数据
     assi_msg_dict={
         "role": "assistant",
         "content": assi_msg
     };
-    msg.append(assi_msg_dict);
+    msg[gid].append(assi_msg_dict);
 
-    if len(msg)>10:
-        msg=msg[2:]
+    if len(msg[gid])>10:
+        msg[gid] = msg[gid][2:]
 
-    requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(str(gid), assi_msg));
+    requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(gid, assi_msg));
 
     return;
 
@@ -109,7 +117,7 @@ def chat(user_message, gid):
 def setu(keyword, gid):
     id=search_pic(keyword);
     if id==-1:
-        requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message=已经没有好看的图啦！".format(str(gid)));
+        requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message=已经没有好看的图啦！".format(gid));
         return;
     else:
         path=download_pic(id);
@@ -125,14 +133,14 @@ def scholar(sch_args, gid):
     if " --not_save" not in sch_args:
         sch_args+=" --not_save";
     sch_msg=f"传入指令为\'{sch_args}\'";
-    requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(str(gid), sch_msg));
+    requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(gid, sch_msg));
     sch_msg="正在搜索喵～";
-    requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(str(gid), sch_msg));
+    requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(gid, sch_msg));
     try:
         sch_msg=bot_api(sch_args);
     except:
         sch_msg="检索失败了喵！";
-    requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(str(gid), sch_msg));
+    requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(gid, sch_msg));
     return;
 
 @register_func(name='generate', alarm=180)
@@ -143,15 +151,17 @@ def generate(prompt, gid):
         os.mkdir(save_dir)
     generated_imgs = os.listdir(save_dir)
     while len(generated_imgs) > 100:
-        os.remove(generated_imgs[-1])
+        os.remove(save_dir + '/' + generated_imgs[-1])
         generated_imgs.pop()
 
+    base_prompt = ', ((masterpiece)), (super delicate),(illustration),(extremely delicate and beautiful),(dynamic angle), (beautiful and delicate eyes), (clear hand details), looking at viewers DSLR photography, sharp focus, Unreal Engine 5, Octane Render, Redshift, ((cinematic lighting)), f/1.4, ISO 200, 1/160s, 8K, RAW, unedited, symmetrical balance, in-frame'
+    prompt += base_prompt
     try:
         headers = {"Content-Type": "application/json"}
         payload = {'key': args.stable_diffusion_key, 
                    'model_id': 'anything-v4', 
-                   'prompt': prompt, 
-                   'negative_prompt': 'painting, extra fingers, mutated hands, poorly drawn hands, poorly drawn face, deformed, ugly, blurry, bad anatomy, bad proportions, extra limbs, cloned face, skinny, glitchy, double torso, extra arms, extra hands, mangled fingers, missing lips, ugly face, distorted face, extra legs, anime', 
+                   'prompt': prompt , 
+                   'negative_prompt': 'painting, (extra fingers), (mutated hands), (poorly drawn hands), poorly drawn face, (deformed), ugly, blurry, bad anatomy, bad proportions, (extra limbs), cloned face, skinny, glitchy, double torso, extra arms, extra hands, mangled fingers, missing lips, ugly face, distorted face, extra legs, bad posture, (wrong human body), anime', 
                    'width': '1080', 'height': '1080', 'samples': '1', 
                    'num_inference_steps': '30', 'seed': None, 
                    'guidance_scale': 7.5, 'webhook': None, 'track_id': None}
@@ -159,21 +169,14 @@ def generate(prompt, gid):
         while True:
             try:
                 response = requests.post(diffusion_url, headers=headers, data=json.dumps(payload))
-                break
+                response_json = response.json()
+                if response_json['status'] == 'success':
+                    break
+                elif response_json['status'] == 'processing':
+                    diffusion_url = response_json['fetch_result']
             except:
                 pass
         print(response.text)
-        response_json = json.loads(response.text)
-        while 'fetch_result' in response_json:
-            while True:
-                try:
-                    response = requests.post(response_json['fetch_result'], headers=headers, data=json.dumps(payload))
-                    break
-                except:
-                    pass
-            cur_json = json.loads(response.text)
-            if cur_json['status'] != 'processing':
-                response_json = cur_json
         img_link = response_json['output'][0]
         img_path = os.path.join(save_dir, img_link.split('/')[-1])
 
@@ -191,6 +194,7 @@ def generate(prompt, gid):
                     break
             except:
                 pass
+        ori_link = img_link
         img_link = response_json['data']['2k']['url']
         pre_ext = img_path.split('.')[-1]
         cur_ext = img_link.split('/')[-1].split('.')[-1]
@@ -199,19 +203,21 @@ def generate(prompt, gid):
         while True:
             try:
                 img = requests.get(img_link)
-                break
+                with open(img_path, 'wb') as f:
+                    f.write(img.content)
+                if os.path.getsize(img_path)/1024 < 50:
+                    img_link = ori_link 
+                else:
+                    break
             except:
                 pass
-            
-        with open(img_path, 'wb') as f:
-            f.write(img.content)
 
         send_pic(gid, img_path);
         return
     
     except Exception as e:
         print(response_json)
-        requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(str(gid), f"生成失败了喵\n{response.text}"));
+        requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(gid, f"生成失败了喵\n{response.text}"));
 
     return
 
@@ -360,25 +366,26 @@ def download_pic(id):
 def send_pic(gid, path):
     dir=os.getcwd();
     path="file:///{}/{}".format(dir, path);
-    requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message=[CQ:image,file={},id=40000]".format(str(gid), path));
+    requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message=[CQ:image,file={},id=40000]".format(gid, path));
     return;
 
 def handle(gid, message):
-    if gid == args.group_id:   # 目前只向特定群提供服务
+    global group_ids
+    if gid in group_ids:   # 目前只向特定群提供服务
         if "[CQ:at,qq={}]".format(args.qq_id) in message:  # 呼出bot
             user_msg=message.replace("[CQ:at,qq={}] ".format(args.qq_id), ""); # 切掉信头
 
             mode=user_msg.split(" ")[0];
             if user_msg=="chat clear":       # 清除chatGPT上下文指令
                     global msg;
-                    msg=[];
-                    requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(args.group_id, "已清除上下文"));
+                    msg[gid] = [];
+                    requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(gid, "已清除上下文"));
                     return;
             if mode in func_dict:
                 _excute(mode, user_msg, gid)
                 return;
 
-            requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(args.group_id, 
+            requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(gid, 
             "这里是chatNEKO喵，使用方法：\n\n" + 
             "1. chatGPT聊天\n   @chatNEKO chat *聊天内容*\n\n" + 
             "2. 清除chatGPT上下文并开始新会话\n   @chatNEKO chat clear\n\n" + 
@@ -389,14 +396,12 @@ def handle(gid, message):
             "请注意，“@chatNEKO”标识符只有在手动键盘输入并选择用户时才能生效。直接从剪贴板粘贴“@chatNEKO”无效。同时@自带空格，无需手动输入。\n\n" + 
             "Github项目地址为 https://github.com/Antinis/chatNEKO 希望更多功能或建议请联系作者Antinis zhangyunxuan@zju.edu.cn\n\n快来跟我玩喵~"));
 
-global msg;
-msg=[];
 signal.signal(signal.SIGALRM, handler)
 signal.signal(signal.SIGINT, handle_exit_signal)
 signal.signal(signal.SIGTERM, handle_exit_signal)
 parser=argparse.ArgumentParser(description='test')
 parser.add_argument('--qq_id', default=False, type=int, help='QQ id of the bot')
-parser.add_argument('--group_id', default=False, type=int, help='Which QQ group do you want to arrange this bot?')
+parser.add_argument('--group_ids', default=False, type=str, help='Which QQ group do you want to arrange this bot?')
 parser.add_argument('--openai_key', default=False, type=str, help='The key of OpenAI ChatGPT API')
 parser.add_argument('--stable_diffusion_key', default=False, type=str, help='The key of Stable Diffusion API')
 parser.add_argument('--x_rapid_key', default=False, type=str, help='The key of X-RapidAPI')
@@ -407,5 +412,12 @@ args=parser.parse_args()
 if args.openai_key:
     openai.api_key=args.openai_key;
 
-requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(args.group_id, "chatNEKO 已启动"));
+global msg;
+msg={};
+group_ids = args.group_ids.split(',')
+
+for group_id in group_ids:
+    requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(group_id, "chatNEKO 已启动"));
+    msg.update({group_id:[]})
+
 app.run(debug=False, host='127.0.0.1', port=5701);
