@@ -41,7 +41,8 @@ def handler(signum, frame):
 def handle_exit_signal(signum, frame):
     global group_ids
     for gid in group_ids:
-        requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(gid, "下线了喵～"));
+        # requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(gid, "下线了喵～"));
+        pass
     exit(0)
 
 def _excute(mode, user_msg, gid):
@@ -221,6 +222,42 @@ def generate(prompt, gid):
 
     return
 
+@register_func(name='anime', alarm=60)
+def anime(msg, gid):
+
+    cfg = "./anime.json"
+    with open(cfg, 'r') as f:
+        anime = json.load(f)
+    url = "https://nyaa.si/?p={page}"
+    format = r"{raw_name}</a>\n\t\t\t\t</td>\n\t\t\t\t<td class=\"text-center\">\n\t\t\t\t\t<a href=\"/download/(\d+).torrent\"><i class=\"fa fa-fw fa-download\"></i></a>\n\t\t\t\t\t<a href=\"magnet:\?xt=urn:btih:(.+?)&amp"
+    bd = {'(': '\(', ')': '\)', '[': '\[', ']': '\]'}
+
+    EPISODE = anime['episode']
+    if msg in anime['anime']:
+        raw_name = anime['anime'][msg]
+        for bdfh in bd:
+            raw_name = raw_name.replace(bdfh, bd[bdfh])
+        raw_name = raw_name.replace(EPISODE, '(\d+)')
+        page = 1
+        pattern = format.format(raw_name=raw_name)
+        while True:
+            page_url = url.format(page=page)
+            m = requests.get(page_url)
+            eps = re.findall(pattern, m.text)
+            # print(eps)
+            if len(eps) > 0:
+                anime_msg = {'episode': eps[0][0], 
+                            'view': eps[0][1], 
+                            'magnet': eps[0][2]}
+                print(anime_msg)
+                break
+            page += 1
+        return_msg = "name: {}\nmagnet: {}".format(raw_name.replace('(\d+)', eps[0][0]), eps[0][2])
+        print(return_msg)
+        requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(gid, return_msg));
+    else:
+        requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(gid, f"{msg}不在搜索范围喵"));
+
 def search_pic(keyword):
     if args.use_proxy:
         proxies={
@@ -392,7 +429,8 @@ def handle(gid, message):
             "3. pixiv插画搜索\n   @chatNEKO setu *关键词*\n\n" + 
             "4. Google Scholar 快速检索\n   @chatNEKO scholar *搜索指令*，用法请参考search_researchers/README.md\n\n" + 
             "5. Stable Diffusion 生成插画\n   @chatNEKO generate *关键词*\n\n" + 
-            "6. 重启chatNEKO\n  @chatNEKO restart\n\n" + 
+            "6. nyaa动画种子搜索\n   @chatNEKO anime *配置文件anime.json中的名字*\n\n" + 
+            "7. 重启chatNEKO\n  @chatNEKO restart\n\n" + 
             "请注意，“@chatNEKO”标识符只有在手动键盘输入并选择用户时才能生效。直接从剪贴板粘贴“@chatNEKO”无效。同时@自带空格，无需手动输入。\n\n" + 
             "Github项目地址为 https://github.com/Antinis/chatNEKO 希望更多功能或建议请联系作者Antinis zhangyunxuan@zju.edu.cn\n\n快来跟我玩喵~"));
 
@@ -417,7 +455,7 @@ msg={};
 group_ids = args.group_ids.split(',')
 
 for group_id in group_ids:
-    requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(group_id, "chatNEKO 已启动"));
+    # requests.get("http://127.0.0.1:5700/send_group_msg?group_id={}&message={}".format(group_id, "chatNEKO 已启动"));
     msg.update({group_id:[]})
 
 app.run(debug=False, host='127.0.0.1', port=5701);
